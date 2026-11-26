@@ -1,0 +1,1146 @@
+---
+protocol: nweb
+version: 1.0
+app: comm
+release: 0.1.9
+css: tailwind
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COMM // v0.1.9 [STUDIO HD AUDIO ENGINE]</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lightweight USP / Gossip Message Broker -->
+  <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <style>
+    body {
+      background-color: #030303;
+      color: #00ff66;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      text-shadow: 0 0 5px rgba(0, 255, 102, 0.4);
+    }
+    ::selection { background: #00ff66; color: #000; }
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 15px;
+      background-color: #00ff66;
+      animation: blink 1s infinite;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
+    @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #000; }
+    ::-webkit-scrollbar-thumb { background: #003311; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00ff66; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-3 md:p-6 select-text">
+
+  <!-- TOP SYSTEM BAR -->
+  <header class="border-b border-green-900/60 pb-3 mb-3 flex flex-wrap items-center justify-between text-xs tracking-widest uppercase gap-2">
+    <div class="flex items-center gap-2">
+      <span id="pulseDot" class="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shadow-[0_0_8px_#eab308]"></span>
+      <span class="font-bold text-green-400">COMM // v0.1.9</span>
+      <span class="text-green-800 hidden sm:inline">| STUDIO HD VOCALS</span>
+    </div>
+    
+    <div class="flex flex-wrap items-center gap-3 text-green-600">
+      <span id="laneBadge" class="text-[10px] px-2 py-0.5 rounded border border-yellow-700 bg-yellow-950/40 text-yellow-400 font-bold">
+        [👻 GHOST LANE]
+      </span>
+      <button id="walletBtn" onclick="toggleNintondoWallet()" class="border border-green-700 bg-green-950/40 hover:bg-green-900 text-green-300 px-2.5 py-1 rounded font-bold transition-colors">
+        [ 🛡️ CONNECT NINTONDO ]
+      </button>
+      <span>CARRIER: <strong id="netIndicator" class="text-yellow-500">CONNECTING...</strong></span>
+    </div>
+  </header>
+
+  <!-- LIVE CALL STATUS DOCK -->
+  <div id="callControlBar" class="hidden border border-yellow-700 bg-yellow-950/20 p-2 rounded-lg mb-3 flex flex-wrap items-center justify-between text-xs font-mono">
+    <div class="flex items-center gap-2">
+      <span class="text-yellow-400 font-bold animate-pulse">📞 HD VOICE HARDLINE:</span>
+      <span id="callPeerName" class="text-white font-bold">peer</span>
+      <span class="text-[10px] text-green-400 border border-green-800 px-1.5 py-0.5 rounded bg-black">OPUS 64KBPS | 85Hz HIGHPASS | COMPRESSOR ✅</span>
+    </div>
+    <div class="flex items-center gap-2 mt-1 sm:mt-0">
+      <button id="muteBtn" onclick="toggleMute()" class="px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 rounded font-bold hover:border-yellow-500 transition-colors">
+        [ 🎙️ MIC ON ]
+      </button>
+      <button onclick="terminateCall(true)" class="px-2 py-1 bg-red-950 border border-red-700 text-red-400 rounded font-bold hover:bg-red-900 transition-colors">
+        [ ❌ HANGUP ]
+      </button>
+    </div>
+  </div>
+
+  <!-- TACTICAL TAB SELECTOR -->
+  <nav class="flex items-center gap-2 mb-3 text-xs border-b border-green-950 pb-2">
+    <button onclick="switchTab('feed')" id="tabBtn-feed" class="px-3 py-1 bg-green-950 text-green-300 font-bold border border-green-700 rounded transition-colors">
+      [ 📜 FEED ]
+    </button>
+    <button onclick="switchTab('contacts')" id="tabBtn-contacts" class="px-3 py-1 bg-black text-green-700 border border-green-900/60 rounded hover:text-green-400 transition-colors">
+      [ 📖 CONTACTS (<span id="contactCount">0</span>) ]
+    </button>
+    <button onclick="switchTab('scratchpad')" id="tabBtn-scratchpad" class="px-3 py-1 bg-black text-green-700 border border-green-900/60 rounded hover:text-green-400 transition-colors">
+      [ 📝 SCRATCHPAD ]
+    </button>
+    <button onclick="switchTab('channels')" id="tabBtn-channels" class="px-3 py-1 bg-black text-green-700 border border-green-900/60 rounded hover:text-green-400 transition-colors">
+      [ 📡 CHANNELS (<span id="channelLabel">#LOBBY</span>) ]
+    </button>
+  </nav>
+
+  <!-- TAB 1: TERMINAL FEED -->
+  <main id="tabContent-feed" class="flex-1 flex flex-col min-h-0">
+    <div id="terminal" class="flex-1 overflow-y-auto space-y-2 text-sm leading-relaxed pb-4 mb-2 font-mono pr-2">
+      <div class="text-green-500/80 mb-2">
+========================================================================<br>
+  COMM PROTOCOL // RELEASE v0.1.9 [STUDIO VOCAL CLEANUP ENGINE]<br>
+  HARDLINE ACTIVE: OPUS 64KBPS HD | 85Hz HUM ELIMINATOR | COMPRESSOR<br>
+========================================================================
+      </div>
+    </div>
+  </main>
+
+  <!-- TAB 2: CONTACTS DIRECTORY -->
+  <main id="tabContent-contacts" class="flex-1 hidden flex-col min-h-0 overflow-y-auto pr-2">
+    <div class="border border-green-900 p-4 rounded-xl bg-black mb-4">
+      <h2 class="text-sm font-bold text-white mb-1 uppercase tracking-wider">Session Address Book (RAM Only)</h2>
+      <p class="text-xs text-zinc-500 mb-4">Peers discovered this session with 10-digit phone numbers and wallet badges.</p>
+      <div id="contactsList" class="space-y-2 text-xs">
+        <div class="text-zinc-600 italic">No peers detected yet this session.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- TAB 3: SCRATCHPAD NOTEBOOK -->
+  <main id="tabContent-scratchpad" class="flex-1 hidden flex-col min-h-0">
+    <div class="border border-green-900 p-4 rounded-xl bg-black flex-1 flex flex-col">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold text-white uppercase tracking-wider">Ephemeral Scratchpad // Volatile Memory</span>
+        <button onclick="wipeScratchpad()" class="text-xs bg-red-950 border border-red-700 text-red-400 px-2 py-0.5 rounded hover:bg-red-900 transition-colors">
+          [ 🗑 WIPE MEMORY ]
+        </button>
+      </div>
+      <textarea 
+        id="scratchpadInput" 
+        placeholder="Paste keys, write temporary notes, or draft transmissions here... Never saved to disk." 
+        class="flex-1 w-full bg-zinc-950 border border-zinc-800 rounded p-3 text-green-300 font-mono text-xs focus:outline-none focus:border-green-500 resize-none leading-relaxed"
+      ></textarea>
+    </div>
+  </main>
+
+  <!-- TAB 4: CHANNELS (PUB-SUB SWARMS) -->
+  <main id="tabContent-channels" class="flex-1 hidden flex-col min-h-0 overflow-y-auto pr-2">
+    <div class="border border-green-900 p-4 rounded-xl bg-black mb-4 space-y-4">
+      <div>
+        <h2 class="text-sm font-bold text-white mb-1 uppercase tracking-wider">Public Channel Swarms</h2>
+        <p class="text-xs text-zinc-500">Tune your radio antenna to an open public channel. Anyone in the channel hears broadcasts.</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div onclick="joinChannel('general')" class="border border-green-800 p-3 rounded-lg bg-zinc-950 cursor-pointer hover:border-green-400 transition-colors">
+          <div class="font-bold text-white text-xs mb-1">#general</div>
+          <div class="text-[10px] text-zinc-500">Open global broadcast channel.</div>
+        </div>
+        <div onclick="joinChannel('bellscoin')" class="border border-green-800 p-3 rounded-lg bg-zinc-950 cursor-pointer hover:border-green-400 transition-colors">
+          <div class="font-bold text-white text-xs mb-1">#bellscoin</div>
+          <div class="text-[10px] text-zinc-500">Bellscoin chain & miner discussions.</div>
+        </div>
+        <div onclick="joinChannel('cypherpunk')" class="border border-green-800 p-3 rounded-lg bg-zinc-950 cursor-pointer hover:border-green-400 transition-colors">
+          <div class="font-bold text-white text-xs mb-1">#cypherpunk</div>
+          <div class="text-[10px] text-zinc-500">P2P, cryptography, and protocols.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- COMMAND INPUT PROMPT -->
+  <footer class="border-t border-green-900/60 pt-3">
+    <div class="flex items-center gap-2">
+      <span id="promptLabel" class="text-green-500 font-bold select-none whitespace-nowrap text-sm">COMM &gt;</span>
+      <input 
+        type="text" 
+        id="cmdInput" 
+        autocomplete="off" 
+        autofocus 
+        placeholder="Type message, /call <phone#>, /pay <amount>, or /help..." 
+        class="flex-1 bg-transparent border-0 outline-none text-green-300 placeholder-green-900 font-mono text-sm caret-green-400"
+        onkeydown="handleKeyNavigation(event)"
+      >
+      <span class="cursor"></span>
+    </div>
+  </footer>
+
+  <audio id="remoteAudioStream" autoplay playsinline></audio>
+
+  <script>
+    // --- REDUNDANT BROKER POOL ---
+    const BROKER_POOL = [
+      'wss://broker.emqx.io:8084/mqtt',
+      'wss://test.mosquitto.org:8081',
+      'wss://broker.hivemq.com:8884/mqtt'
+    ];
+    let currentBrokerIdx = 0;
+
+    const seenNonces = new Set();
+
+    // --- APP STATE ---
+    let myAddress = null;
+    let myPhoneNumber = null;
+    let myHandle = null;
+    let isGhost = true;
+
+    let gossipClient = null;
+    let peerConnection = null;
+    let dataChannel = null;
+    let rawMicStream = null;
+    let cleanAudioStream = null;
+    let webAudioContext = null;
+    let activeCallPeer = null;
+    let isMicMuted = false;
+    let ringtoneInterval = null;
+
+    // Ephemeral state
+    let activeChannel = "general";
+    let activeChatTarget = null;
+    let sessionContacts = new Map();
+
+    // CLI History
+    let cmdHistory = [];
+    let historyIndex = -1;
+
+    const term = document.getElementById('terminal');
+    const input = document.getElementById('cmdInput');
+    const netInd = document.getElementById('netIndicator');
+    const pulseDot = document.getElementById('pulseDot');
+    const promptLabel = document.getElementById('promptLabel');
+    const laneBadge = document.getElementById('laneBadge');
+    const walletBtn = document.getElementById('walletBtn');
+    const callControlBar = document.getElementById('callControlBar');
+    const callPeerName = document.getElementById('callPeerName');
+    const muteBtn = document.getElementById('muteBtn');
+    const contactCount = document.getElementById('contactCount');
+    const channelLabel = document.getElementById('channelLabel');
+
+    function log(msg, type = "info") {
+      const line = document.createElement('div');
+      if (type === "system") {
+        line.className = "text-yellow-400";
+        line.innerHTML = `[SYS] ${msg}`;
+      } else if (type === "error") {
+        line.className = "text-red-500 font-bold";
+        line.innerHTML = `[ERR] ${msg}`;
+      } else if (type === "peer") {
+        line.className = "text-white font-bold bg-green-950/40 p-2.5 rounded border border-green-800/60 my-1";
+        line.innerHTML = msg;
+      } else if (type === "self") {
+        line.className = "text-green-400";
+        line.innerHTML = msg;
+      } else {
+        line.className = "text-green-500/90";
+        line.innerHTML = msg;
+      }
+      term.appendChild(line);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    window.copyText = function(str) {
+      navigator.clipboard.writeText(str).then(() => {
+        log(`Copied <b>${str}</b> to clipboard!`, "system");
+      });
+    };
+
+    // --- SYNTHESIZED CYBERPUNK AUDIO CHIMES ---
+    function playChime(type) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        if (type === "message") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.22);
+        } else if (type === "ring") {
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.4);
+        }
+      } catch (e) {}
+    }
+
+    function startRingtone() {
+      stopRingtone();
+      playChime("ring");
+      ringtoneInterval = setInterval(() => playChime("ring"), 1600);
+    }
+
+    function stopRingtone() {
+      if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+      }
+    }
+
+    // --- WEB AUDIO API: 85Hz HIGHPASS + BROADCAST COMPRESSOR ---
+    async function buildCleanVocalStream(rawStream) {
+      try {
+        webAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (webAudioContext.state === 'suspended') {
+          await webAudioContext.resume();
+        }
+
+        const sourceNode = webAudioContext.createMediaStreamSource(rawStream);
+
+        // 1. Highpass Filter: Cuts low-end desk rumblings and fan hum below 85Hz
+        const highpass = webAudioContext.createBiquadFilter();
+        highpass.type = "highpass";
+        highpass.frequency.setValueAtTime(85, webAudioContext.currentTime);
+
+        // 2. Lowpass Shelf: Cuts electrical whine and static hiss above 7.5kHz
+        const lowpass = webAudioContext.createBiquadFilter();
+        lowpass.type = "lowpass";
+        lowpass.frequency.setValueAtTime(7500, webAudioContext.currentTime);
+
+        // 3. Studio Dynamics Compressor: Levels voice volume
+        const compressor = webAudioContext.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, webAudioContext.currentTime);
+        compressor.knee.setValueAtTime(30, webAudioContext.currentTime);
+        compressor.ratio.setValueAtTime(3.5, webAudioContext.currentTime);
+        compressor.attack.setValueAtTime(0.003, webAudioContext.currentTime);
+        compressor.release.setValueAtTime(0.25, webAudioContext.currentTime);
+
+        const destination = webAudioContext.createMediaStreamDestination();
+
+        // Connect the pipeline
+        sourceNode.connect(highpass);
+        highpass.connect(lowpass);
+        lowpass.connect(compressor);
+        compressor.connect(destination);
+
+        return destination.stream;
+      } catch (err) {
+        log(`WebAudio Filter Note: Using direct stream (${err.message})`, "system");
+        return rawStream;
+      }
+    }
+
+    // --- OPUS 64KBPS CODEC BOOST (THE DISCORD TRICK) ---
+    function boostOpusSdp(sdp) {
+      return sdp.replace(/a=fmtp:111 (.*)/g, (match, params) => {
+        let p = params;
+        if (!p.includes("maxaveragebitrate")) p += ";maxaveragebitrate=64000";
+        if (!p.includes("useinbandfec")) p += ";useinbandfec=1";
+        if (!p.includes("cbr")) p += ";cbr=1";
+        if (!p.includes("stereo")) p += ";stereo=0";
+        return `a=fmtp:111 ${p}`;
+      });
+    }
+
+    // --- PACKET VALIDATION ---
+    function validatePacketIntegrity(packet) {
+      const now = Date.now();
+      if (Math.abs(now - packet.timestamp) > 300000) return false;
+      if (seenNonces.has(packet.nonce)) return false;
+      seenNonces.add(packet.nonce);
+      if (seenNonces.size > 2000) seenNonces.clear();
+      return true;
+    }
+
+    function createNonce() {
+      return Array.from(crypto.getRandomValues(new Uint8Array(8)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // --- 10-DIGIT DETERMINISTIC PHONE DERIVATION ---
+    async function deriveTenDigitPhone(identifier) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode("NCOMM-10DIGIT-SEED:" + identifier);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      const hashBytes = new Uint8Array(hashBuffer);
+
+      let bigNum = 0n;
+      for (let i = 0; i < 6; i++) {
+        bigNum = (bigNum << 8n) | BigInt(hashBytes[i]);
+      }
+      
+      const tenDigits = (bigNum % 10000000000n).toString().padStart(10, '0');
+      return `${tenDigits.slice(0, 3)}-${tenDigits.slice(3, 6)}-${tenDigits.slice(6)}`;
+    }
+
+    // --- 1. TABS SYSTEM ---
+    function switchTab(tabId) {
+      const tabs = ['feed', 'contacts', 'scratchpad', 'channels'];
+      tabs.forEach(t => {
+        document.getElementById(`tabContent-${t}`).classList.add('hidden');
+        document.getElementById(`tabBtn-${t}`).className = "px-3 py-1 bg-black text-green-700 border border-green-900/60 rounded hover:text-green-400 transition-colors";
+      });
+      document.getElementById(`tabContent-${tabId}`).classList.remove('hidden');
+      document.getElementById(`tabBtn-${tabId}`).className = "px-3 py-1 bg-green-950 text-green-300 font-bold border border-green-700 rounded transition-colors";
+
+      if (tabId === 'feed') {
+        input.focus();
+        term.scrollTop = term.scrollHeight;
+      }
+    }
+
+    function wipeScratchpad() {
+      if (confirm("Wipe scratchpad memory completely?")) {
+        document.getElementById('scratchpadInput').value = "";
+        log("Scratchpad RAM purged.", "system");
+      }
+    }
+
+    // --- 2. CONTACTS & QUICK ACTIONS ---
+    function registerPeerContact(peerId, phoneNum, laneType, handle) {
+      if (!sessionContacts.has(peerId) && peerId !== myAddress) {
+        sessionContacts.set(peerId, { 
+          lastSeen: Date.now(), 
+          phone: phoneNum || "UNKNOWN", 
+          lane: laneType || "GHOST",
+          handle: handle || null
+        });
+        contactCount.innerText = sessionContacts.size;
+        updateContactsUI();
+      }
+    }
+
+    function updateContactsUI() {
+      const list = document.getElementById('contactsList');
+      if (sessionContacts.size === 0) {
+        list.innerHTML = `<div class="text-zinc-600 italic">No peers detected yet this session.</div>`;
+        return;
+      }
+      list.innerHTML = "";
+      sessionContacts.forEach((data, id) => {
+        const row = document.createElement('div');
+        row.className = "flex flex-wrap items-center justify-between border border-zinc-800 p-2.5 rounded bg-zinc-950 gap-2";
+        
+        const isVer = data.lane === "VERIFIED" || id.startsWith("bel1");
+        const badge = isVer 
+          ? `<span class="text-[9px] bg-green-950 border border-green-600 text-green-400 px-1 rounded">🛡️ VERIFIED</span>`
+          : `<span class="text-[9px] bg-yellow-950 border border-yellow-700 text-yellow-400 px-1 rounded">👻 GHOST</span>`;
+
+        const nameDisplay = data.handle ? `<b>${data.handle}</b> (${id})` : id;
+
+        row.innerHTML = `
+          <div>
+            <div class="font-bold text-white text-xs">${nameDisplay}</div>
+            <div class="text-green-500 font-mono text-[11px] font-bold">📞 ${data.phone} ${badge}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="quickMsg('${data.handle || id}')" class="px-2 py-1 bg-green-950 border border-green-700 text-green-300 rounded font-bold hover:bg-green-800">[ 💬 MSG ]</button>
+            <button onclick="quickCall('${data.phone || id}')" class="px-2 py-1 bg-yellow-950 border border-yellow-700 text-yellow-400 rounded font-bold hover:bg-yellow-800">[ 📞 CALL ]</button>
+            <button onclick="quickPay('${id}')" class="px-2 py-1 bg-yellow-500/20 border border-yellow-600 text-yellow-400 rounded font-bold hover:bg-yellow-500/40">[ 💰 PAY ]</button>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    window.quickMsg = function(target) {
+      activeChatTarget = target;
+      switchTab('feed');
+      updatePrompt();
+      input.value = "";
+      input.focus();
+      log(`Chat locked to <b>${target}</b>. Type your response:`, "system");
+    };
+
+    window.quickCall = function(target) {
+      switchTab('feed');
+      initiateP2PCall(target);
+    };
+
+    window.quickPay = function(target) {
+      switchTab('feed');
+      input.value = `/pay 1 ${target}`;
+      input.focus();
+      log(`Ready to send Bellscoin to <b>${target}</b>. Adjust amount:`, "system");
+    };
+
+    // --- 3. IDENTITY BOOT ---
+    async function bootGhostMode() {
+      const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(3)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      myAddress = `ghost_${randomHex}`;
+      isGhost = true;
+      myHandle = null;
+      myPhoneNumber = await deriveTenDigitPhone(myAddress);
+
+      laneBadge.innerText = "[👻 GHOST LANE]";
+      laneBadge.className = "text-[10px] px-2 py-0.5 rounded border border-yellow-700 bg-yellow-950/40 text-yellow-400 font-bold";
+      
+      walletBtn.innerText = "[ 🛡️ CONNECT NINTONDO ]";
+      walletBtn.className = "border border-green-700 bg-green-950/40 hover:bg-green-900 text-green-300 px-2.5 py-1 rounded font-bold transition-colors";
+
+      updatePrompt();
+
+      log(`<b>YOUR 10-DIGIT NCOMM PHONE #:</b> <span onclick="window.copyText('${myPhoneNumber}')" class="text-yellow-400 font-bold bg-yellow-950/40 border border-yellow-600 px-2 py-0.5 rounded cursor-pointer hover:bg-yellow-900" title="Click to copy">${myPhoneNumber}</span>`, "system");
+      log(`Session Burner ID: <span onclick="window.copyText('${myAddress}')" class="text-white font-mono cursor-pointer underline">${myAddress}</span> (Click to copy)`, "system");
+      log(`Status: <strong class="text-yellow-400">GHOST STEALTH (RAM ONLY)</strong>. HD Vocals & 85Hz Filter Active.`, "system");
+
+      connectGossipAirwaves();
+    }
+
+    async function toggleNintondoWallet() {
+      const provider = window.nintondo?.provider || window.nintondo;
+
+      if (!provider) {
+        log("Nintondo Wallet extension not detected. Ensure Nintondo is installed and this page is running over HTTPS.", "error");
+        return;
+      }
+
+      if (!isGhost) {
+        try {
+          if (provider.disconnect) await provider.disconnect();
+        } catch (e) {}
+        log("Disconnected from Nintondo Wallet. Reverting to Ghost Lane...", "system");
+        bootGhostMode();
+        return;
+      }
+
+      try {
+        log("Initiating Nintondo authentication...", "system");
+        const address = await provider.connect("bellsMainnet");
+        
+        if (address) {
+          myAddress = address;
+          isGhost = false;
+          myPhoneNumber = await deriveTenDigitPhone(myAddress);
+
+          if (myAddress.toLowerCase() === "bel1qu077yqduxsu8gwrstwrer4sgffckxxv859ca5x") {
+            myHandle = "NCRYPTD";
+          }
+
+          laneBadge.innerText = "[🛡️ VERIFIED BELLSCOIN LANE]";
+          laneBadge.className = "text-[10px] px-2 py-0.5 rounded border border-green-600 bg-green-950/50 text-green-300 font-bold shadow-[0_0_8px_rgba(0,255,102,0.2)]";
+
+          const short = myAddress.slice(0, 6) + "..." + myAddress.slice(-4);
+          walletBtn.innerText = myHandle ? `[ 🛡️ ${myHandle} ]` : `[ 🛡️ ${short} ]`;
+          walletBtn.className = "border border-green-500 bg-green-900 text-white px-2.5 py-1 rounded font-bold";
+
+          log("==================================================", "system");
+          log(`>>> IDENTITY VERIFIED BY BELLSCOIN BLOCKCHAIN <<<`, "system");
+          if (myHandle) log(`Verified Handle: <strong class="text-green-300 text-base">${myHandle}</strong>`, "system");
+          log(`Permanent NCOMM Phone #: <strong class="text-yellow-400 text-base">${myPhoneNumber}</strong>`, "system");
+          log(`Verified Address: <b>${myAddress}</b>`, "system");
+          log("==================================================", "system");
+
+          updatePrompt();
+          connectGossipAirwaves();
+
+          if (provider.on) {
+            provider.on('accountsChanged', () => toggleNintondoWallet());
+            provider.on('disconnected', () => bootGhostMode());
+          }
+        }
+      } catch (err) {
+        log(`Nintondo connection rejected: ${err.message}`, "error");
+      }
+    }
+
+    function updatePrompt() {
+      if (activeChatTarget) {
+        promptLabel.innerText = `COMM [DM: ${activeChatTarget}] >`;
+      } else {
+        promptLabel.innerText = `COMM [${activeChannel ? '#' + activeChannel : 'LOBBY'}] >`;
+      }
+    }
+
+    // --- 4. GOSSIP AIRWAVES & REDUNDANT FAILOVER POOL ---
+    function connectGossipAirwaves() {
+      if (gossipClient) gossipClient.end();
+
+      const brokerUrl = BROKER_POOL[currentBrokerIdx];
+      log(`Tuning antenna to carrier [${currentBrokerIdx + 1}/${BROKER_POOL.length}]...`, "system");
+
+      gossipClient = mqtt.connect(brokerUrl, {
+        clientId: 'ncomm_' + Math.random().toString(16).substring(2, 10),
+        clean: true,
+        connectTimeout: 5000
+      });
+
+      gossipClient.on('connect', () => {
+        netInd.innerText = "ONLINE (AIRWAVES)";
+        netInd.className = "text-green-400 font-bold";
+        pulseDot.className = "w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_#00ff66]";
+        log(">>> CARRIER LOCKED. AIRWAVES SHIELDED. <<<", "system");
+
+        gossipClient.subscribe(`ncomm/mailbox/${myAddress}`);
+        if (myPhoneNumber) gossipClient.subscribe(`ncomm/phone/${myPhoneNumber}`);
+        if (myHandle) gossipClient.subscribe(`ncomm/handle/${myHandle.toLowerCase()}`);
+
+        joinChannel('general', true);
+      });
+
+      gossipClient.on('message', (topic, payload) => {
+        try {
+          const packet = JSON.parse(payload.toString());
+          handleIncomingTransmission(topic, packet);
+        } catch (e) {}
+      });
+
+      gossipClient.on('error', (err) => {
+        log(`Carrier hiccup on broker ${currentBrokerIdx + 1}. Failing over...`, "error");
+        currentBrokerIdx = (currentBrokerIdx + 1) % BROKER_POOL.length;
+        setTimeout(connectGossipAirwaves, 2000);
+      });
+    }
+
+    function joinChannel(chanName, silent = false) {
+      if (activeChannel && gossipClient) {
+        gossipClient.unsubscribe(`ncomm/channel/${activeChannel}`);
+      }
+      activeChannel = chanName.toLowerCase();
+      channelLabel.innerText = `#${activeChannel}`;
+      activeChatTarget = null;
+      updatePrompt();
+
+      if (gossipClient && gossipClient.connected) {
+        gossipClient.subscribe(`ncomm/channel/${activeChannel}`, () => {
+          if (!silent) log(`Tuned to channel: <strong class="text-white">#${activeChannel}</strong>.`, "system");
+          switchTab('feed');
+        });
+      }
+    }
+
+    // --- 5. TRANSMISSIONS & VERIFICATION ---
+    async function handleIncomingTransmission(topic, packet) {
+      if (!validatePacketIntegrity(packet)) {
+        log("Intercepted and dropped expired or replayed packet.", "error");
+        return;
+      }
+
+      registerPeerContact(packet.from, packet.phone, packet.lane, packet.handle);
+
+      const isSenderVerified = packet.lane === "VERIFIED" || packet.from.startsWith("bel1");
+      const laneTag = isSenderVerified 
+        ? `<span class="text-[9px] bg-green-950 border border-green-600 text-green-300 px-1 py-0.5 rounded font-bold ml-1">🛡️ VERIFIED</span>`
+        : `<span class="text-[9px] bg-yellow-950 border border-yellow-700 text-yellow-400 px-1 py-0.5 rounded font-bold ml-1">👻 GHOST</span>`;
+
+      const senderDisplay = packet.handle ? `<b>${packet.handle}</b> (${packet.from})` : packet.from;
+
+      if (packet.type === "CHAT") {
+        playChime("message");
+        const quickActions = `
+          <span class="inline-flex gap-1 ml-2 select-none">
+            <span onclick="window.quickMsg('${packet.handle || packet.from}')" class="cursor-pointer text-[10px] bg-green-950 border border-green-700 px-1.5 py-0.5 rounded text-green-300 hover:bg-green-800">[MSG]</span>
+            <span onclick="window.quickCall('${packet.phone || packet.from}')" class="cursor-pointer text-[10px] bg-yellow-950 border border-yellow-700 px-1.5 py-0.5 rounded text-yellow-400 hover:bg-yellow-800">[CALL]</span>
+            <span onclick="window.quickPay('${packet.from}')" class="cursor-pointer text-[10px] bg-yellow-500/20 border border-yellow-600 px-1.5 py-0.5 rounded text-yellow-400 hover:bg-yellow-500/40">[PAY]</span>
+          </span>
+        `;
+        log(`<div>[DM from ${senderDisplay}] <span class="text-yellow-400 font-mono">(${packet.phone || 'NO PHONE'})</span> ${laneTag}${quickActions}:</div><div class="text-white font-normal mt-1">${escapeHtml(packet.text)}</div>`, "peer");
+      } 
+      else if (packet.type === "PAYMENT_NOTIFY") {
+        playChime("message");
+        log(`
+          <div class="border border-yellow-500 bg-yellow-950/40 p-3 rounded-lg my-1 text-xs">
+            <div class="text-yellow-400 font-bold text-sm mb-1">💰 BELLSCOIN PAYMENT CONFIRMED!</div>
+            <div>AMOUNT: <strong class="text-white text-base">${packet.amount} BEL</strong></div>
+            <div>SENDER: <span class="text-zinc-300">${senderDisplay}</span></div>
+            <div>TXID: <span class="text-zinc-400 font-mono break-all">${packet.txid || 'Confirmed'}</span></div>
+          </div>
+        `, "system");
+      }
+      else if (packet.type === "CHANNEL_MSG") {
+        playChime("message");
+        const quickActions = `
+          <span class="inline-flex gap-1 ml-2 select-none">
+            <span onclick="window.quickMsg('${packet.handle || packet.from}')" class="cursor-pointer text-[10px] bg-green-950 border border-green-700 px-1 rounded text-green-300 hover:bg-green-800">[MSG]</span>
+          </span>
+        `;
+        log(`[#${packet.channel} | ${senderDisplay}] ${laneTag}${quickActions}: <span class="text-white font-normal">${escapeHtml(packet.text)}</span>`, "system");
+      }
+      else if (packet.type === "CALL_OFFER") {
+        startRingtone();
+        log(`
+          <div class="border border-yellow-500 bg-yellow-950/40 p-3 rounded-lg my-2">
+            <div class="text-yellow-400 font-bold mb-1">📞 INCOMING VOICE CALL TRANSMISSION</div>
+            <div class="text-xs text-white mb-2">CALLER: <b>${senderDisplay}</b> (${packet.phone || 'NO PHONE'}) ${laneTag}</div>
+            <div class="flex gap-2">
+              <button onclick="acceptIncomingCall('${packet.from}', ${JSON.stringify(packet.offer).replace(/"/g, '&quot;')})" class="px-3 py-1 bg-green-950 border border-green-600 text-green-300 rounded font-bold hover:bg-green-900">[ 📞 ACCEPT CALL ]</button>
+              <button onclick="terminateCall(true)" class="px-3 py-1 bg-red-950 border border-red-700 text-red-400 rounded font-bold hover:bg-red-900">[ ❌ DECLINE ]</button>
+            </div>
+          </div>
+        `, "system");
+      } 
+      else if (packet.type === "CALL_ANSWER") {
+        stopRingtone();
+        if (peerConnection && peerConnection.signalingState !== "closed") {
+          log(`Received Answer token! Engaging 64kbps HD audio hardline...`, "system");
+          peerConnection.setRemoteDescription(new RTCSessionDescription(packet.answer));
+        }
+      }
+      else if (packet.type === "CALL_HANGUP") {
+        stopRingtone();
+        terminateCall(false);
+      }
+    }
+
+    function sendInstantText(target, text) {
+      if (!gossipClient || !gossipClient.connected) {
+        log("Airwaves offline. Check connection.", "error");
+        return;
+      }
+
+      const cleanTarget = target.trim();
+      let targetTopic = "";
+
+      if (/^\d{3}-\d{3}-\d{4}$/.test(cleanTarget)) {
+        targetTopic = `ncomm/phone/${cleanTarget}`;
+      } else if (cleanTarget.startsWith("bel1") || cleanTarget.startsWith("ghost_")) {
+        targetTopic = `ncomm/mailbox/${cleanTarget}`;
+      } else {
+        targetTopic = `ncomm/handle/${cleanTarget.toLowerCase()}`;
+      }
+
+      const payload = {
+        type: "CHAT",
+        from: myAddress,
+        phone: myPhoneNumber,
+        handle: myHandle,
+        lane: isGhost ? "GHOST" : "VERIFIED",
+        text: text,
+        timestamp: Date.now(),
+        nonce: createNonce()
+      };
+
+      gossipClient.publish(targetTopic, JSON.stringify(payload));
+      log(`[TO ${cleanTarget}]: ${escapeHtml(text)}`, "self");
+      registerPeerContact(cleanTarget, "UNKNOWN", "UNKNOWN", null);
+    }
+
+    function sendChannelMessage(channel, text) {
+      if (!gossipClient || !gossipClient.connected) return;
+
+      const payload = {
+        type: "CHANNEL_MSG",
+        channel: channel,
+        from: myAddress,
+        phone: myPhoneNumber,
+        handle: myHandle,
+        lane: isGhost ? "GHOST" : "VERIFIED",
+        text: text,
+        timestamp: Date.now(),
+        nonce: createNonce()
+      };
+
+      gossipClient.publish(`ncomm/channel/${channel}`, JSON.stringify(payload));
+      log(`[YOU in #${channel}]: ${escapeHtml(text)}`, "self");
+    }
+
+    // --- IN-CHAT BELLSCOIN PAYMENTS ---
+    async function executeBellscoinPayment(targetAddress, amountBells) {
+      if (isGhost) {
+        log("Connect Nintondo Wallet to send real Bellscoin payments.", "error");
+        return;
+      }
+
+      const provider = window.nintondo?.provider || window.nintondo;
+      if (!provider) {
+        log("Nintondo extension not reachable.", "error");
+        return;
+      }
+
+      log(`Preparing to send <b>${amountBells} BEL</b> to <b>${targetAddress}</b>... Requesting wallet authorization...`, "system");
+
+      try {
+        let txid = null;
+        if (provider.sendBells) {
+          txid = await provider.sendBells(targetAddress, Math.round(amountBells * 1e8));
+        } else if (provider.sendTransaction) {
+          txid = await provider.sendTransaction({ to: targetAddress, amount: Math.round(amountBells * 1e8) });
+        } else {
+          txid = prompt("Payment authorization: Enter confirmed TXID or click OK to announce:");
+        }
+
+        log("==================================================", "system");
+        log(`>>> BELLSCOIN PAYMENT TRANSMITTED SUCCESSFULLY <<<`, "system");
+        log(`Sent: <strong class="text-white">${amountBells} BEL</strong> to ${targetAddress}`, "system");
+        if (txid) log(`TXID: <span class="font-mono text-zinc-400 break-all">${txid}</span>`, "system");
+        log("==================================================", "system");
+
+        const targetTopic = `ncomm/mailbox/${targetAddress}`;
+        const payload = {
+          type: "PAYMENT_NOTIFY",
+          from: myAddress,
+          handle: myHandle,
+          amount: amountBells,
+          txid: txid || "Confirmed on-chain",
+          timestamp: Date.now(),
+          nonce: createNonce()
+        };
+
+        gossipClient.publish(targetTopic, JSON.stringify(payload));
+      } catch (err) {
+        log(`Payment cancelled: ${err.message}`, "error");
+      }
+    }
+
+    // --- 6. WEBRTC LIVE VOICE CALL (WITH STUDIO AUDIO FILTERS & OPUS HD BOOST) ---
+    const RTC_CONFIG = {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" }
+      ]
+    };
+
+    // Cleaned parameters to avoid hardware driver clashing
+    const NATIVE_AUDIO_CONSTRAINTS = {
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      },
+      video: false
+    };
+
+    async function initiateP2PCall(target) {
+      if (!gossipClient || !gossipClient.connected) {
+        log("Airwaves offline. Cannot place call.", "error");
+        return;
+      }
+
+      activeCallPeer = target.trim();
+      let targetTopic = "";
+
+      if (/^\d{3}-\d{3}-\d{4}$/.test(activeCallPeer)) {
+        targetTopic = `ncomm/phone/${activeCallPeer}`;
+      } else if (activeCallPeer.startsWith("bel1") || activeCallPeer.startsWith("ghost_")) {
+        targetTopic = `ncomm/mailbox/${activeCallPeer}`;
+      } else {
+        targetTopic = `ncomm/handle/${activeCallPeer.toLowerCase()}`;
+      }
+
+      log(`Dialing <b>${activeCallPeer}</b>... Engaging Vocal Cleanup Engine...`, "system");
+
+      try {
+        rawMicStream = await navigator.mediaDevices.getUserMedia(NATIVE_AUDIO_CONSTRAINTS);
+        cleanAudioStream = await buildCleanVocalStream(rawMicStream);
+        log("Audio Pipeline Active: [85Hz Highpass: ON | Vocal Compressor: ON]", "system");
+      } catch (err) {
+        log(`Microphone access error: ${err.message}`, "error");
+        return;
+      }
+
+      peerConnection = new RTCPeerConnection(RTC_CONFIG);
+      dataChannel = peerConnection.createDataChannel("hardline-data");
+      setupHardlineHooks();
+
+      cleanAudioStream.getTracks().forEach(track => peerConnection.addTrack(track, cleanAudioStream));
+
+      peerConnection.onicecandidate = (event) => {
+        if (!event.candidate) {
+          // Apply Opus 64kbps HD Boost to local offer
+          const boostedSdp = boostOpusSdp(peerConnection.localDescription.sdp);
+          const offerPacket = {
+            type: "CALL_OFFER",
+            from: myAddress,
+            phone: myPhoneNumber,
+            handle: myHandle,
+            lane: isGhost ? "GHOST" : "VERIFIED",
+            offer: { type: peerConnection.localDescription.type, sdp: boostedSdp },
+            timestamp: Date.now(),
+            nonce: createNonce()
+          };
+          gossipClient.publish(targetTopic, JSON.stringify(offerPacket));
+          log(`Offer dispatched to ${activeCallPeer}. Awaiting answer...`, "system");
+        }
+      };
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+    }
+
+    window.acceptIncomingCall = async function(callerAddress, offerData) {
+      stopRingtone();
+      activeCallPeer = callerAddress;
+      log(`Accepting call from <b>${callerAddress}</b>... Requesting mic...`, "system");
+
+      try {
+        rawMicStream = await navigator.mediaDevices.getUserMedia(NATIVE_AUDIO_CONSTRAINTS);
+        cleanAudioStream = await buildCleanVocalStream(rawMicStream);
+        log("Vocal Cleanup Engine active.", "system");
+      } catch (e) {
+        log("Proceeding without mic: Listen-only mode.", "system");
+      }
+
+      peerConnection = new RTCPeerConnection(RTC_CONFIG);
+      peerConnection.ondatachannel = (e) => {
+        dataChannel = e.channel;
+        setupHardlineHooks();
+      };
+
+      setupHardlineHooks();
+
+      if (cleanAudioStream) {
+        cleanAudioStream.getTracks().forEach(track => peerConnection.addTrack(track, cleanAudioStream));
+      }
+
+      peerConnection.onicecandidate = (event) => {
+        if (!event.candidate) {
+          // Apply Opus 64kbps HD Boost to local answer
+          const boostedSdp = boostOpusSdp(peerConnection.localDescription.sdp);
+          const answerPacket = {
+            type: "CALL_ANSWER",
+            from: myAddress,
+            phone: myPhoneNumber,
+            handle: myHandle,
+            lane: isGhost ? "GHOST" : "VERIFIED",
+            answer: { type: peerConnection.localDescription.type, sdp: boostedSdp },
+            timestamp: Date.now(),
+            nonce: createNonce()
+          };
+          gossipClient.publish(`ncomm/mailbox/${activeCallPeer}`, JSON.stringify(answerPacket));
+          log(`Answer dispatched. Hardline connecting...`, "system");
+        }
+      };
+
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+    };
+
+    function setupHardlineHooks() {
+      peerConnection.ontrack = (event) => {
+        log(">>> INCOMING AUDIO STREAM RECEIVED! OUTPUTTING VIA SPEAKERS <<<", "system");
+        const audio = document.getElementById('remoteAudioStream');
+        audio.srcObject = event.streams[0];
+        audio.play().catch(e => console.log("Autoplay unmuted:", e));
+      };
+
+      if (dataChannel) {
+        dataChannel.onopen = () => {
+          netInd.innerText = "WEBRTC HARDLINE (LOCKED)";
+          callControlBar.classList.remove('hidden');
+          callPeerName.innerText = activeCallPeer;
+          log("==================================================", "system");
+          log(`>>> DIRECT WEBRTC HD VOICE LINE OPEN WITH ${activeCallPeer} <<<`, "system");
+          log("64kbps Opus Stream Active | 85Hz Highpass Active", "system");
+          log("==================================================", "system");
+        };
+        dataChannel.onmessage = (e) => {
+          log(`[HARDLINE from ${activeCallPeer}]: ${escapeHtml(e.data)}`, "peer");
+        };
+        dataChannel.onclose = () => {
+          terminateCall(false);
+        };
+      }
+    }
+
+    window.toggleMute = function() {
+      if (!rawMicStream) return;
+      isMicMuted = !isMicMuted;
+      rawMicStream.getAudioTracks().forEach(track => {
+        track.enabled = !isMicMuted;
+      });
+
+      if (isMicMuted) {
+        muteBtn.innerText = "[ 🔇 MUTED ]";
+        muteBtn.className = "px-2 py-1 bg-red-950 border border-red-700 text-red-400 rounded font-bold";
+        log("[SYS] Microphone MUTED.", "system");
+      } else {
+        muteBtn.innerText = "[ 🎙️ MIC ON ]";
+        muteBtn.className = "px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 rounded font-bold hover:border-yellow-500";
+        log("[SYS] Microphone UNMUTED.", "system");
+      }
+    };
+
+    function terminateCall(notifyPeer = true) {
+      stopRingtone();
+      if (notifyPeer && gossipClient && activeCallPeer) {
+        gossipClient.publish(`ncomm/mailbox/${activeCallPeer}`, JSON.stringify({
+          type: "CALL_HANGUP",
+          from: myAddress,
+          timestamp: Date.now(),
+          nonce: createNonce()
+        }));
+      }
+
+      if (rawMicStream) {
+        rawMicStream.getTracks().forEach(t => t.stop());
+        rawMicStream = null;
+      }
+      if (cleanAudioStream) {
+        cleanAudioStream.getTracks().forEach(t => t.stop());
+        cleanAudioStream = null;
+      }
+      if (webAudioContext) {
+        webAudioContext.close().catch(() => {});
+        webAudioContext = null;
+      }
+      if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+      }
+
+      isMicMuted = false;
+      muteBtn.innerText = "[ 🎙️ MIC ON ]";
+      muteBtn.className = "px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 rounded font-bold hover:border-yellow-500";
+      callControlBar.classList.add('hidden');
+      netInd.innerText = "ONLINE (AIRWAVES)";
+      log(">>> CALL TERMINATED / HARDLINE CLOSED <<<", "system");
+      activeCallPeer = null;
+    }
+
+    // --- 7. CLI ARROW NAVIGATION & INPUT ROUTER ---
+    function handleKeyNavigation(e) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (cmdHistory.length > 0 && historyIndex < cmdHistory.length - 1) {
+          historyIndex++;
+          input.value = cmdHistory[cmdHistory.length - 1 - historyIndex];
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          historyIndex--;
+          input.value = cmdHistory[cmdHistory.length - 1 - historyIndex];
+        } else if (historyIndex === 0) {
+          historyIndex = -1;
+          input.value = "";
+        }
+      } else if (e.key === 'Enter') {
+        handleCommandSubmit();
+      }
+    }
+
+    function handleCommandSubmit() {
+      const raw = input.value.trim();
+      input.value = "";
+      if (!raw) return;
+
+      cmdHistory.push(raw);
+      historyIndex = -1;
+
+      if (raw.startsWith('/')) {
+        const parts = raw.split(' ');
+        const cmd = parts[0].toLowerCase();
+        const arg1 = parts[1];
+        const arg2 = parts[2];
+        const rest = parts.slice(2).join(' ').trim();
+
+        switch (cmd) {
+          case '/help':
+            runHelp();
+            break;
+          case '/whoami':
+            log(`Identity: <strong class="text-white">${myAddress}</strong><br>Handle: <strong class="text-green-300">${myHandle || 'NONE'}</strong><br>10-Digit Phone: <strong class="text-yellow-400 font-bold">${myPhoneNumber}</strong><br>Lane: ${isGhost ? 'Ghost Stealth' : 'Verified Bellscoin'}`, "system");
+            break;
+          case '/msg':
+            if (!arg1 || !rest) log("Usage: /msg &lt;handle_or_phone_or_id&gt; &lt;text&gt;", "error");
+            else sendInstantText(arg1, rest);
+            break;
+          case '/chat':
+            if (!arg1) {
+              activeChatTarget = null;
+              log("Switched to public channel mode.", "system");
+            } else {
+              activeChatTarget = arg1.trim();
+              log(`Locked active DM prompt to <b>${activeChatTarget}</b>. Type normally to chat:`, "system");
+            }
+            updatePrompt();
+            break;
+          case '/call':
+            if (!arg1) log("Usage: /call &lt;handle_or_phone_or_id&gt;", "error");
+            else initiateP2PCall(arg1);
+            break;
+          case '/pay':
+            if (!arg1) {
+              log("Usage: /pay &lt;amount&gt; &lt;address_optional_if_in_dm&gt;", "error");
+            } else {
+              const amount = parseFloat(arg1);
+              const target = arg2 || activeChatTarget;
+              if (!target) {
+                log("Specify recipient address: /pay &lt;amount&gt; &lt;address&gt;", "error");
+              } else if (isNaN(amount) || amount <= 0) {
+                log("Invalid amount specified.", "error");
+              } else {
+                executeBellscoinPayment(target, amount);
+              }
+            }
+            break;
+          case '/mute':
+            if (!isMicMuted) toggleMute();
+            break;
+          case '/unmute':
+            if (isMicMuted) toggleMute();
+            break;
+          case '/hangup':
+            terminateCall(true);
+            break;
+          case '/join':
+            if (!arg1) log("Usage: /join &lt;channel_name&gt; (e.g. /join bellscoin)", "error");
+            else joinChannel(arg1.replace('#', ''));
+            break;
+          case '/ghost':
+            bootGhostMode();
+            break;
+          case '/clear':
+            term.innerHTML = "";
+            break;
+          default:
+            log(`Unknown command '${cmd}'. Type /help for manual.`, "error");
+        }
+      } else {
+        if (dataChannel && dataChannel.readyState === "open") {
+          dataChannel.send(raw);
+          log(`[HARDLINE YOU]: ${escapeHtml(raw)}`, "self");
+        } else if (activeChatTarget) {
+          sendInstantText(activeChatTarget, raw);
+        } else if (activeChannel) {
+          sendChannelMessage(activeChannel, raw);
+        } else {
+          log("No channel or DM active. Use <span class='text-white'>/msg &lt;handle_or_phone&gt; &lt;text&gt;</span> or <span class='text-white'>/join bellscoin</span>", "error");
+        }
+      }
+    }
+
+    function runHelp() {
+      log(`
+<b>COMMAND MANUAL [COMM v0.1.9]:</b><br>
+&nbsp;&nbsp;<span class="text-white">/call &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;- Call by Handle or 10-digit Phone<br>
+&nbsp;&nbsp;<span class="text-white">/msg &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;&nbsp;- Text by Handle or 10-digit Phone<br>
+&nbsp;&nbsp;<span class="text-white">/chat &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;- Lock prompt to text back and forth freely<br>
+&nbsp;&nbsp;<span class="text-white">/pay &lt;amount&gt; [addr]</span>&nbsp;&nbsp;&nbsp;&nbsp;- Send Bellscoin peer-to-peer in chat<br>
+&nbsp;&nbsp;<span class="text-white">/mute | /unmute</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Toggle microphone audio mid-call<br>
+&nbsp;&nbsp;<span class="text-white">/hangup</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Cut active voice call<br>
+&nbsp;&nbsp;<span class="text-white">/join &lt;chan&gt;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Switch public channels (e.g. /join bellscoin)<br>
+&nbsp;&nbsp;<span class="text-white">/whoami</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Display your Handle, 10-digit Phone # and Lane<br>
+&nbsp;&nbsp;<span class="text-white">/ghost</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Reset to anonymous Ghost Lane<br>
+&nbsp;&nbsp;<span class="text-white">/clear</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Clear screen<br>
+<i>* Audio Pipeline: 85Hz Highpass + Vocal Compressor + 64kbps Opus Boost.</i>
+      `);
+    }
+
+    bootGhostMode();
+
+    window.addEventListener('click', () => {
+      const active = document.activeElement;
+      if (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA') {
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>
