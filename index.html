@@ -2,7 +2,7 @@
 protocol: nweb
 version: 1.0
 app: comm
-release: 0.1.8
+release: 0.1.9
 css: tailwind
 ---
 <!DOCTYPE html>
@@ -10,7 +10,7 @@ css: tailwind
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>COMM // v0.1.8 [STREAMLINED AIRWAVES]</title>
+  <title>COMM // v0.1.9 [STUDIO HD AUDIO ENGINE]</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lightweight USP / Gossip Message Broker -->
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
@@ -44,8 +44,8 @@ css: tailwind
   <header class="border-b border-green-900/60 pb-3 mb-3 flex flex-wrap items-center justify-between text-xs tracking-widest uppercase gap-2">
     <div class="flex items-center gap-2">
       <span id="pulseDot" class="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shadow-[0_0_8px_#eab308]"></span>
-      <span class="font-bold text-green-400">COMM // v0.1.8</span>
-      <span class="text-green-800 hidden sm:inline">| NCRYPTD NETWORK</span>
+      <span class="font-bold text-green-400">COMM // v0.1.9</span>
+      <span class="text-green-800 hidden sm:inline">| STUDIO HD VOCALS</span>
     </div>
     
     <div class="flex flex-wrap items-center gap-3 text-green-600">
@@ -62,9 +62,9 @@ css: tailwind
   <!-- LIVE CALL STATUS DOCK -->
   <div id="callControlBar" class="hidden border border-yellow-700 bg-yellow-950/20 p-2 rounded-lg mb-3 flex flex-wrap items-center justify-between text-xs font-mono">
     <div class="flex items-center gap-2">
-      <span class="text-yellow-400 font-bold animate-pulse">📞 VOICE HARDLINE ACTIVE:</span>
+      <span class="text-yellow-400 font-bold animate-pulse">📞 HD VOICE HARDLINE:</span>
       <span id="callPeerName" class="text-white font-bold">peer</span>
-      <span class="text-[10px] text-green-400 border border-green-800 px-1.5 py-0.5 rounded bg-black">DSP: AEC ✅ | ANS ✅ | AGC ✅</span>
+      <span class="text-[10px] text-green-400 border border-green-800 px-1.5 py-0.5 rounded bg-black">OPUS 64KBPS | 85Hz HIGHPASS | COMPRESSOR ✅</span>
     </div>
     <div class="flex items-center gap-2 mt-1 sm:mt-0">
       <button id="muteBtn" onclick="toggleMute()" class="px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 rounded font-bold hover:border-yellow-500 transition-colors">
@@ -97,8 +97,8 @@ css: tailwind
     <div id="terminal" class="flex-1 overflow-y-auto space-y-2 text-sm leading-relaxed pb-4 mb-2 font-mono pr-2">
       <div class="text-green-500/80 mb-2">
 ========================================================================<br>
-  COMM PROTOCOL // RELEASE v0.1.8 [STREAMLINED AIRWAVES ENGINE]<br>
-  P2P VOICE & DATA HARDLINES ACTIVE. ZERO BYTES SAVED ON-CHAIN.<br>
+  COMM PROTOCOL // RELEASE v0.1.9 [STUDIO VOCAL CLEANUP ENGINE]<br>
+  HARDLINE ACTIVE: OPUS 64KBPS HD | 85Hz HUM ELIMINATOR | COMPRESSOR<br>
 ========================================================================
       </div>
     </div>
@@ -173,7 +173,7 @@ css: tailwind
     </div>
   </footer>
 
-  <audio id="remoteAudioStream" autoplay></audio>
+  <audio id="remoteAudioStream" autoplay playsinline></audio>
 
   <script>
     // --- REDUNDANT BROKER POOL ---
@@ -195,7 +195,9 @@ css: tailwind
     let gossipClient = null;
     let peerConnection = null;
     let dataChannel = null;
-    let localMediaStream = null;
+    let rawMicStream = null;
+    let cleanAudioStream = null;
+    let webAudioContext = null;
     let activeCallPeer = null;
     let isMicMuted = false;
     let ringtoneInterval = null;
@@ -298,10 +300,65 @@ css: tailwind
       }
     }
 
-    // --- PACKET VALIDATION (RELAXED 5-MINUTE SKEW) ---
+    // --- WEB AUDIO API: 85Hz HIGHPASS + BROADCAST COMPRESSOR ---
+    async function buildCleanVocalStream(rawStream) {
+      try {
+        webAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (webAudioContext.state === 'suspended') {
+          await webAudioContext.resume();
+        }
+
+        const sourceNode = webAudioContext.createMediaStreamSource(rawStream);
+
+        // 1. Highpass Filter: Cuts low-end desk rumblings and fan hum below 85Hz
+        const highpass = webAudioContext.createBiquadFilter();
+        highpass.type = "highpass";
+        highpass.frequency.setValueAtTime(85, webAudioContext.currentTime);
+
+        // 2. Lowpass Shelf: Cuts electrical whine and static hiss above 7.5kHz
+        const lowpass = webAudioContext.createBiquadFilter();
+        lowpass.type = "lowpass";
+        lowpass.frequency.setValueAtTime(7500, webAudioContext.currentTime);
+
+        // 3. Studio Dynamics Compressor: Levels voice volume
+        const compressor = webAudioContext.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, webAudioContext.currentTime);
+        compressor.knee.setValueAtTime(30, webAudioContext.currentTime);
+        compressor.ratio.setValueAtTime(3.5, webAudioContext.currentTime);
+        compressor.attack.setValueAtTime(0.003, webAudioContext.currentTime);
+        compressor.release.setValueAtTime(0.25, webAudioContext.currentTime);
+
+        const destination = webAudioContext.createMediaStreamDestination();
+
+        // Connect the pipeline
+        sourceNode.connect(highpass);
+        highpass.connect(lowpass);
+        lowpass.connect(compressor);
+        compressor.connect(destination);
+
+        return destination.stream;
+      } catch (err) {
+        log(`WebAudio Filter Note: Using direct stream (${err.message})`, "system");
+        return rawStream;
+      }
+    }
+
+    // --- OPUS 64KBPS CODEC BOOST (THE DISCORD TRICK) ---
+    function boostOpusSdp(sdp) {
+      return sdp.replace(/a=fmtp:111 (.*)/g, (match, params) => {
+        let p = params;
+        if (!p.includes("maxaveragebitrate")) p += ";maxaveragebitrate=64000";
+        if (!p.includes("useinbandfec")) p += ";useinbandfec=1";
+        if (!p.includes("cbr")) p += ";cbr=1";
+        if (!p.includes("stereo")) p += ";stereo=0";
+        return `a=fmtp:111 ${p}`;
+      });
+    }
+
+    // --- PACKET VALIDATION ---
     function validatePacketIntegrity(packet) {
       const now = Date.now();
-      if (Math.abs(now - packet.timestamp) > 300000) return false; // 5-minute leeway
+      if (Math.abs(now - packet.timestamp) > 300000) return false;
       if (seenNonces.has(packet.nonce)) return false;
       seenNonces.add(packet.nonce);
       if (seenNonces.size > 2000) seenNonces.clear();
@@ -440,7 +497,7 @@ css: tailwind
 
       log(`<b>YOUR 10-DIGIT NCOMM PHONE #:</b> <span onclick="window.copyText('${myPhoneNumber}')" class="text-yellow-400 font-bold bg-yellow-950/40 border border-yellow-600 px-2 py-0.5 rounded cursor-pointer hover:bg-yellow-900" title="Click to copy">${myPhoneNumber}</span>`, "system");
       log(`Session Burner ID: <span onclick="window.copyText('${myAddress}')" class="text-white font-mono cursor-pointer underline">${myAddress}</span> (Click to copy)`, "system");
-      log(`Status: <strong class="text-yellow-400">GHOST STEALTH (RAM ONLY)</strong>. Replay defense & failover pool active.`, "system");
+      log(`Status: <strong class="text-yellow-400">GHOST STEALTH (RAM ONLY)</strong>. HD Vocals & 85Hz Filter Active.`, "system");
 
       connectGossipAirwaves();
     }
@@ -629,9 +686,8 @@ css: tailwind
       } 
       else if (packet.type === "CALL_ANSWER") {
         stopRingtone();
-        // FIXED: Checks peerConnection existence, accepts answer reliably!
         if (peerConnection && peerConnection.signalingState !== "closed") {
-          log(`Received Answer token from ${senderDisplay}! Hardline locking in...`, "system");
+          log(`Received Answer token! Engaging 64kbps HD audio hardline...`, "system");
           peerConnection.setRemoteDescription(new RTCSessionDescription(packet.answer));
         }
       }
@@ -741,7 +797,7 @@ css: tailwind
       }
     }
 
-    // --- 6. WEBRTC LIVE VOICE CALL WITH FULL DSP ---
+    // --- 6. WEBRTC LIVE VOICE CALL (WITH STUDIO AUDIO FILTERS & OPUS HD BOOST) ---
     const RTC_CONFIG = {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
@@ -749,14 +805,12 @@ css: tailwind
       ]
     };
 
-    const HARDENED_DSP_CONSTRAINTS = {
+    // Cleaned parameters to avoid hardware driver clashing
+    const NATIVE_AUDIO_CONSTRAINTS = {
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
-        sampleRate: 48000,
-        sampleSize: 16
+        autoGainControl: true
       },
       video: false
     };
@@ -778,11 +832,12 @@ css: tailwind
         targetTopic = `ncomm/handle/${activeCallPeer.toLowerCase()}`;
       }
 
-      log(`Dialing <b>${activeCallPeer}</b>... Engaging DSP Microphone...`, "system");
+      log(`Dialing <b>${activeCallPeer}</b>... Engaging Vocal Cleanup Engine...`, "system");
 
       try {
-        localMediaStream = await navigator.mediaDevices.getUserMedia(HARDENED_DSP_CONSTRAINTS);
-        log("DSP Microphone active: [AEC: ON | ANS: ON | AGC: ON]", "system");
+        rawMicStream = await navigator.mediaDevices.getUserMedia(NATIVE_AUDIO_CONSTRAINTS);
+        cleanAudioStream = await buildCleanVocalStream(rawMicStream);
+        log("Audio Pipeline Active: [85Hz Highpass: ON | Vocal Compressor: ON]", "system");
       } catch (err) {
         log(`Microphone access error: ${err.message}`, "error");
         return;
@@ -792,17 +847,19 @@ css: tailwind
       dataChannel = peerConnection.createDataChannel("hardline-data");
       setupHardlineHooks();
 
-      localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
+      cleanAudioStream.getTracks().forEach(track => peerConnection.addTrack(track, cleanAudioStream));
 
       peerConnection.onicecandidate = (event) => {
         if (!event.candidate) {
+          // Apply Opus 64kbps HD Boost to local offer
+          const boostedSdp = boostOpusSdp(peerConnection.localDescription.sdp);
           const offerPacket = {
             type: "CALL_OFFER",
             from: myAddress,
             phone: myPhoneNumber,
             handle: myHandle,
             lane: isGhost ? "GHOST" : "VERIFIED",
-            offer: peerConnection.localDescription,
+            offer: { type: peerConnection.localDescription.type, sdp: boostedSdp },
             timestamp: Date.now(),
             nonce: createNonce()
           };
@@ -818,11 +875,12 @@ css: tailwind
     window.acceptIncomingCall = async function(callerAddress, offerData) {
       stopRingtone();
       activeCallPeer = callerAddress;
-      log(`Accepting call from <b>${callerAddress}</b>... Requesting DSP mic...`, "system");
+      log(`Accepting call from <b>${callerAddress}</b>... Requesting mic...`, "system");
 
       try {
-        localMediaStream = await navigator.mediaDevices.getUserMedia(HARDENED_DSP_CONSTRAINTS);
-        log("DSP Microphone initialized cleanly.", "system");
+        rawMicStream = await navigator.mediaDevices.getUserMedia(NATIVE_AUDIO_CONSTRAINTS);
+        cleanAudioStream = await buildCleanVocalStream(rawMicStream);
+        log("Vocal Cleanup Engine active.", "system");
       } catch (e) {
         log("Proceeding without mic: Listen-only mode.", "system");
       }
@@ -835,24 +893,26 @@ css: tailwind
 
       setupHardlineHooks();
 
-      if (localMediaStream) {
-        localMediaStream.getTracks().forEach(track => peerConnection.addTrack(track, localMediaStream));
+      if (cleanAudioStream) {
+        cleanAudioStream.getTracks().forEach(track => peerConnection.addTrack(track, cleanAudioStream));
       }
 
       peerConnection.onicecandidate = (event) => {
         if (!event.candidate) {
+          // Apply Opus 64kbps HD Boost to local answer
+          const boostedSdp = boostOpusSdp(peerConnection.localDescription.sdp);
           const answerPacket = {
             type: "CALL_ANSWER",
             from: myAddress,
             phone: myPhoneNumber,
             handle: myHandle,
             lane: isGhost ? "GHOST" : "VERIFIED",
-            answer: peerConnection.localDescription,
+            answer: { type: peerConnection.localDescription.type, sdp: boostedSdp },
             timestamp: Date.now(),
             nonce: createNonce()
           };
           gossipClient.publish(`ncomm/mailbox/${activeCallPeer}`, JSON.stringify(answerPacket));
-          log(`Answer dispatched. Locking voice hardline...`, "system");
+          log(`Answer dispatched. Hardline connecting...`, "system");
         }
       };
 
@@ -866,6 +926,7 @@ css: tailwind
         log(">>> INCOMING AUDIO STREAM RECEIVED! OUTPUTTING VIA SPEAKERS <<<", "system");
         const audio = document.getElementById('remoteAudioStream');
         audio.srcObject = event.streams[0];
+        audio.play().catch(e => console.log("Autoplay unmuted:", e));
       };
 
       if (dataChannel) {
@@ -874,8 +935,8 @@ css: tailwind
           callControlBar.classList.remove('hidden');
           callPeerName.innerText = activeCallPeer;
           log("==================================================", "system");
-          log(`>>> DIRECT WEBRTC VOICE & DATA HARDLINE OPEN WITH ${activeCallPeer} <<<`, "system");
-          log("DSP Active: Echo Cancellation & Noise Filtering engaged.", "system");
+          log(`>>> DIRECT WEBRTC HD VOICE LINE OPEN WITH ${activeCallPeer} <<<`, "system");
+          log("64kbps Opus Stream Active | 85Hz Highpass Active", "system");
           log("==================================================", "system");
         };
         dataChannel.onmessage = (e) => {
@@ -888,9 +949,9 @@ css: tailwind
     }
 
     window.toggleMute = function() {
-      if (!localMediaStream) return;
+      if (!rawMicStream) return;
       isMicMuted = !isMicMuted;
-      localMediaStream.getAudioTracks().forEach(track => {
+      rawMicStream.getAudioTracks().forEach(track => {
         track.enabled = !isMicMuted;
       });
 
@@ -916,9 +977,17 @@ css: tailwind
         }));
       }
 
-      if (localMediaStream) {
-        localMediaStream.getTracks().forEach(t => t.stop());
-        localMediaStream = null;
+      if (rawMicStream) {
+        rawMicStream.getTracks().forEach(t => t.stop());
+        rawMicStream = null;
+      }
+      if (cleanAudioStream) {
+        cleanAudioStream.getTracks().forEach(t => t.stop());
+        cleanAudioStream = null;
+      }
+      if (webAudioContext) {
+        webAudioContext.close().catch(() => {});
+        webAudioContext = null;
       }
       if (peerConnection) {
         peerConnection.close();
@@ -1049,7 +1118,7 @@ css: tailwind
 
     function runHelp() {
       log(`
-<b>COMMAND MANUAL [COMM v0.1.8]:</b><br>
+<b>COMMAND MANUAL [COMM v0.1.9]:</b><br>
 &nbsp;&nbsp;<span class="text-white">/call &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;- Call by Handle or 10-digit Phone<br>
 &nbsp;&nbsp;<span class="text-white">/msg &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;&nbsp;- Text by Handle or 10-digit Phone<br>
 &nbsp;&nbsp;<span class="text-white">/chat &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;- Lock prompt to text back and forth freely<br>
@@ -1060,7 +1129,7 @@ css: tailwind
 &nbsp;&nbsp;<span class="text-white">/whoami</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Display your Handle, 10-digit Phone # and Lane<br>
 &nbsp;&nbsp;<span class="text-white">/ghost</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Reset to anonymous Ghost Lane<br>
 &nbsp;&nbsp;<span class="text-white">/clear</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Clear screen<br>
-<i>* All local workarounds stripped. Pure streamlined airwaves active.</i>
+<i>* Audio Pipeline: 85Hz Highpass + Vocal Compressor + 64kbps Opus Boost.</i>
       `);
     }
 
