@@ -2,7 +2,7 @@
 protocol: nweb
 version: 1.0
 app: comm
-release: 0.1.7
+release: 0.1.8
 css: tailwind
 ---
 <!DOCTYPE html>
@@ -10,7 +10,7 @@ css: tailwind
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>COMM // v0.1.7 [HARDENED CYBER-PROTOCOL]</title>
+  <title>COMM // v0.1.8 [STREAMLINED AIRWAVES]</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lightweight USP / Gossip Message Broker -->
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
@@ -44,8 +44,8 @@ css: tailwind
   <header class="border-b border-green-900/60 pb-3 mb-3 flex flex-wrap items-center justify-between text-xs tracking-widest uppercase gap-2">
     <div class="flex items-center gap-2">
       <span id="pulseDot" class="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shadow-[0_0_8px_#eab308]"></span>
-      <span class="font-bold text-green-400">COMM // v0.1.7</span>
-      <span class="text-green-800 hidden sm:inline">| MIL-SPEC CYBERPUNK</span>
+      <span class="font-bold text-green-400">COMM // v0.1.8</span>
+      <span class="text-green-800 hidden sm:inline">| NCRYPTD NETWORK</span>
     </div>
     
     <div class="flex flex-wrap items-center gap-3 text-green-600">
@@ -97,8 +97,8 @@ css: tailwind
     <div id="terminal" class="flex-1 overflow-y-auto space-y-2 text-sm leading-relaxed pb-4 mb-2 font-mono pr-2">
       <div class="text-green-500/80 mb-2">
 ========================================================================<br>
-  COMM PROTOCOL // RELEASE v0.1.7 [HARDENED PROTOCOL CORE]<br>
-  ACTIVE SHIELDS: MICRO-PoW | 512B PADDING | REPLAY NONCES | FAILOVER POOL<br>
+  COMM PROTOCOL // RELEASE v0.1.8 [STREAMLINED AIRWAVES ENGINE]<br>
+  P2P VOICE & DATA HARDLINES ACTIVE. ZERO BYTES SAVED ON-CHAIN.<br>
 ========================================================================
       </div>
     </div>
@@ -108,7 +108,7 @@ css: tailwind
   <main id="tabContent-contacts" class="flex-1 hidden flex-col min-h-0 overflow-y-auto pr-2">
     <div class="border border-green-900 p-4 rounded-xl bg-black mb-4">
       <h2 class="text-sm font-bold text-white mb-1 uppercase tracking-wider">Session Address Book (RAM Only)</h2>
-      <p class="text-xs text-zinc-500 mb-4">Discovered peers with authenticated Bellscoin addresses or stealth burner status.</p>
+      <p class="text-xs text-zinc-500 mb-4">Peers discovered this session with 10-digit phone numbers and wallet badges.</p>
       <div id="contactsList" class="space-y-2 text-xs">
         <div class="text-zinc-600 italic">No peers detected yet this session.</div>
       </div>
@@ -136,8 +136,8 @@ css: tailwind
   <main id="tabContent-channels" class="flex-1 hidden flex-col min-h-0 overflow-y-auto pr-2">
     <div class="border border-green-900 p-4 rounded-xl bg-black mb-4 space-y-4">
       <div>
-        <h2 class="text-sm font-bold text-white mb-1 uppercase tracking-wider">Public Channel Swarms (Protected by Micro-PoW)</h2>
-        <p class="text-xs text-zinc-500">Every transmission requires a 20ms cryptographic proof of work to prevent bot spam.</p>
+        <h2 class="text-sm font-bold text-white mb-1 uppercase tracking-wider">Public Channel Swarms</h2>
+        <p class="text-xs text-zinc-500">Tune your radio antenna to an open public channel. Anyone in the channel hears broadcasts.</p>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div onclick="joinChannel('general')" class="border border-green-800 p-3 rounded-lg bg-zinc-950 cursor-pointer hover:border-green-400 transition-colors">
@@ -184,7 +184,6 @@ css: tailwind
     ];
     let currentBrokerIdx = 0;
 
-    // --- REPLAY PROTECTION NONCE CACHE ---
     const seenNonces = new Set();
 
     // --- APP STATE ---
@@ -299,56 +298,13 @@ css: tailwind
       }
     }
 
-    // --- SHIELD 1: MICRO PROOF-OF-WORK (HASHCASH SPAM RESISTANCE) ---
-    async function solveMicroPoW(content, targetZeros = 3) {
-      const prefix = "0".repeat(targetZeros);
-      const encoder = new TextEncoder();
-      let nonce = 0;
-      while (true) {
-        const data = encoder.encode(`${content}:${nonce}`);
-        const hashBuf = await crypto.subtle.digest("SHA-256", data);
-        const hashHex = Array.from(new Uint8Array(hashBuf))
-          .map(b => b.toString(16).padStart(2, '0')).join('');
-        if (hashHex.startsWith(prefix)) {
-          return { nonce, hash: hashHex };
-        }
-        nonce++;
-        if (nonce > 400000) break; // emergency break
-      }
-      return { nonce, hash: "unsolved" };
-    }
-
-    async function verifyMicroPoW(content, nonce, targetZeros = 3) {
-      const prefix = "0".repeat(targetZeros);
-      const encoder = new TextEncoder();
-      const data = encoder.encode(`${content}:${nonce}`);
-      const hashBuf = await crypto.subtle.digest("SHA-256", data);
-      const hashHex = Array.from(new Uint8Array(hashBuf))
-        .map(b => b.toString(16).padStart(2, '0')).join('');
-      return hashHex.startsWith(prefix);
-    }
-
-    // --- SHIELD 2: 512-BYTE FIXED CRYPTOGRAPHIC PADDING ---
-    function padToFixedSize(dataObj, fixedByteLen = 512) {
-      const json = JSON.stringify(dataObj);
-      const diff = fixedByteLen - json.length;
-      if (diff > 0) {
-        const dummyBytes = Array.from(crypto.getRandomValues(new Uint8Array(Math.floor(diff / 2))))
-          .map(b => b.toString(16).padStart(2, '0')).join('').slice(0, diff);
-        dataObj._pad = dummyBytes;
-      }
-      return JSON.stringify(dataObj);
-    }
-
-    // --- SHIELD 3: REPLAY & TIMESTAMP VALIDATION ---
+    // --- PACKET VALIDATION (RELAXED 5-MINUTE SKEW) ---
     function validatePacketIntegrity(packet) {
       const now = Date.now();
-      // Drop if older than 60 seconds or in future by 30 seconds
-      if (Math.abs(now - packet.timestamp) > 60000) return false;
-      // Drop if nonce was already seen
+      if (Math.abs(now - packet.timestamp) > 300000) return false; // 5-minute leeway
       if (seenNonces.has(packet.nonce)) return false;
       seenNonces.add(packet.nonce);
-      if (seenNonces.size > 2000) seenNonces.clear(); // bound memory
+      if (seenNonces.size > 2000) seenNonces.clear();
       return true;
     }
 
@@ -484,7 +440,7 @@ css: tailwind
 
       log(`<b>YOUR 10-DIGIT NCOMM PHONE #:</b> <span onclick="window.copyText('${myPhoneNumber}')" class="text-yellow-400 font-bold bg-yellow-950/40 border border-yellow-600 px-2 py-0.5 rounded cursor-pointer hover:bg-yellow-900" title="Click to copy">${myPhoneNumber}</span>`, "system");
       log(`Session Burner ID: <span onclick="window.copyText('${myAddress}')" class="text-white font-mono cursor-pointer underline">${myAddress}</span> (Click to copy)`, "system");
-      log(`Status: <strong class="text-yellow-400">GHOST STEALTH (RAM ONLY)</strong>. Replays & packet sniffing blocked.`, "system");
+      log(`Status: <strong class="text-yellow-400">GHOST STEALTH (RAM ONLY)</strong>. Replay defense & failover pool active.`, "system");
 
       connectGossipAirwaves();
     }
@@ -515,7 +471,6 @@ css: tailwind
           isGhost = false;
           myPhoneNumber = await deriveTenDigitPhone(myAddress);
 
-          // Bound official handle if available or check profile
           if (myAddress.toLowerCase() === "bel1qu077yqduxsu8gwrstwrer4sgffckxxv859ca5x") {
             myHandle = "NCRYPTD";
           }
@@ -560,12 +515,12 @@ css: tailwind
       if (gossipClient) gossipClient.end();
 
       const brokerUrl = BROKER_POOL[currentBrokerIdx];
-      log(`Tuning antenna to broker [${currentBrokerIdx + 1}/${BROKER_POOL.length}]: ${brokerUrl}...`, "system");
+      log(`Tuning antenna to carrier [${currentBrokerIdx + 1}/${BROKER_POOL.length}]...`, "system");
 
       gossipClient = mqtt.connect(brokerUrl, {
         clientId: 'ncomm_' + Math.random().toString(16).substring(2, 10),
         clean: true,
-        connectTimeout: 4000
+        connectTimeout: 5000
       });
 
       gossipClient.on('connect', () => {
@@ -574,13 +529,8 @@ css: tailwind
         pulseDot.className = "w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_#00ff66]";
         log(">>> CARRIER LOCKED. AIRWAVES SHIELDED. <<<", "system");
 
-        // 1. Subscribe to Address Mailbox
         gossipClient.subscribe(`ncomm/mailbox/${myAddress}`);
-
-        // 2. Subscribe to 10-Digit Phone Mailbox
         if (myPhoneNumber) gossipClient.subscribe(`ncomm/phone/${myPhoneNumber}`);
-
-        // 3. Subscribe to Handle Mailbox
         if (myHandle) gossipClient.subscribe(`ncomm/handle/${myHandle.toLowerCase()}`);
 
         joinChannel('general', true);
@@ -593,7 +543,6 @@ css: tailwind
         } catch (e) {}
       });
 
-      // Failover handling
       gossipClient.on('error', (err) => {
         log(`Carrier hiccup on broker ${currentBrokerIdx + 1}. Failing over...`, "error");
         currentBrokerIdx = (currentBrokerIdx + 1) % BROKER_POOL.length;
@@ -612,7 +561,7 @@ css: tailwind
 
       if (gossipClient && gossipClient.connected) {
         gossipClient.subscribe(`ncomm/channel/${activeChannel}`, () => {
-          if (!silent) log(`Tuned to public channel: <strong class="text-white">#${activeChannel}</strong>. Anti-spam PoW active.`, "system");
+          if (!silent) log(`Tuned to channel: <strong class="text-white">#${activeChannel}</strong>.`, "system");
           switchTab('feed');
         });
       }
@@ -620,19 +569,9 @@ css: tailwind
 
     // --- 5. TRANSMISSIONS & VERIFICATION ---
     async function handleIncomingTransmission(topic, packet) {
-      // 1. Replay Armor Check
       if (!validatePacketIntegrity(packet)) {
         log("Intercepted and dropped expired or replayed packet.", "error");
         return;
-      }
-
-      // 2. Channel PoW Verification
-      if (packet.type === "CHANNEL_MSG") {
-        const isValid = await verifyMicroPoW(packet.text, packet.pow_nonce, 3);
-        if (!isValid) {
-          log("Dropped unverified spam broadcast (Failed Micro-PoW).", "error");
-          return;
-        }
       }
 
       registerPeerContact(packet.from, packet.phone, packet.lane, packet.handle);
@@ -690,8 +629,9 @@ css: tailwind
       } 
       else if (packet.type === "CALL_ANSWER") {
         stopRingtone();
-        if (activeCallPeer === packet.from && peerConnection) {
-          log(`Received Answer token from ${packet.from}! Hardline active.`, "system");
+        // FIXED: Checks peerConnection existence, accepts answer reliably!
+        if (peerConnection && peerConnection.signalingState !== "closed") {
+          log(`Received Answer token from ${senderDisplay}! Hardline locking in...`, "system");
           peerConnection.setRemoteDescription(new RTCSessionDescription(packet.answer));
         }
       }
@@ -729,19 +669,13 @@ css: tailwind
         nonce: createNonce()
       };
 
-      // Apply 512-byte traffic padding
-      const paddedPayload = padToFixedSize(payload, 512);
-
-      gossipClient.publish(targetTopic, paddedPayload);
+      gossipClient.publish(targetTopic, JSON.stringify(payload));
       log(`[TO ${cleanTarget}]: ${escapeHtml(text)}`, "self");
       registerPeerContact(cleanTarget, "UNKNOWN", "UNKNOWN", null);
     }
 
-    async function sendChannelMessage(channel, text) {
+    function sendChannelMessage(channel, text) {
       if (!gossipClient || !gossipClient.connected) return;
-
-      // Solve client-side micro-PoW (20ms)
-      const pow = await solveMicroPoW(text, 3);
 
       const payload = {
         type: "CHANNEL_MSG",
@@ -751,13 +685,11 @@ css: tailwind
         handle: myHandle,
         lane: isGhost ? "GHOST" : "VERIFIED",
         text: text,
-        pow_nonce: pow.nonce,
         timestamp: Date.now(),
         nonce: createNonce()
       };
 
-      const paddedPayload = padToFixedSize(payload, 512);
-      gossipClient.publish(`ncomm/channel/${channel}`, paddedPayload);
+      gossipClient.publish(`ncomm/channel/${channel}`, JSON.stringify(payload));
       log(`[YOU in #${channel}]: ${escapeHtml(text)}`, "self");
     }
 
@@ -803,7 +735,7 @@ css: tailwind
           nonce: createNonce()
         };
 
-        gossipClient.publish(targetTopic, padToFixedSize(payload, 512));
+        gossipClient.publish(targetTopic, JSON.stringify(payload));
       } catch (err) {
         log(`Payment cancelled: ${err.message}`, "error");
       }
@@ -1117,18 +1049,18 @@ css: tailwind
 
     function runHelp() {
       log(`
-<b>COMMAND MANUAL [COMM v0.1.7]:</b><br>
-&nbsp;&nbsp;<span class="text-white">/call &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;- Call by Handle (e.g. ncryptd) or 10-digit Phone<br>
+<b>COMMAND MANUAL [COMM v0.1.8]:</b><br>
+&nbsp;&nbsp;<span class="text-white">/call &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;- Call by Handle or 10-digit Phone<br>
 &nbsp;&nbsp;<span class="text-white">/msg &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;&nbsp;- Text by Handle or 10-digit Phone<br>
 &nbsp;&nbsp;<span class="text-white">/chat &lt;handle_or_phone&gt;</span>&nbsp;&nbsp;- Lock prompt to text back and forth freely<br>
 &nbsp;&nbsp;<span class="text-white">/pay &lt;amount&gt; [addr]</span>&nbsp;&nbsp;&nbsp;&nbsp;- Send Bellscoin peer-to-peer in chat<br>
 &nbsp;&nbsp;<span class="text-white">/mute | /unmute</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Toggle microphone audio mid-call<br>
 &nbsp;&nbsp;<span class="text-white">/hangup</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Cut active voice call<br>
-&nbsp;&nbsp;<span class="text-white">/join &lt;chan&gt;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Switch public channels (Protected by PoW)<br>
+&nbsp;&nbsp;<span class="text-white">/join &lt;chan&gt;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Switch public channels (e.g. /join bellscoin)<br>
 &nbsp;&nbsp;<span class="text-white">/whoami</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Display your Handle, 10-digit Phone # and Lane<br>
 &nbsp;&nbsp;<span class="text-white">/ghost</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Reset to anonymous Ghost Lane<br>
 &nbsp;&nbsp;<span class="text-white">/clear</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Clear screen<br>
-<i>* Active Shields: Micro-PoW anti-spam, 512B traffic padding, replay nonces.</i>
+<i>* All local workarounds stripped. Pure streamlined airwaves active.</i>
       `);
     }
 
